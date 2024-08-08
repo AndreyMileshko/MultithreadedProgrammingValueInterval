@@ -1,16 +1,17 @@
 import java.util.*;
+import java.util.concurrent.*;
 
 public class Main {
 
-    public static void main(String[] args) throws InterruptedException {
+    public static void main(String[] args) throws InterruptedException, ExecutionException {
         String[] texts = new String[25];
         for (int i = 0; i < texts.length; i++) {
             texts[i] = generateText("aab", 30_000);
         }
-        List<Thread> threads = new ArrayList<>();
+        List<Future<Integer>> futures = new ArrayList<>();
         long startTs = System.currentTimeMillis(); // start time
         for (String text : texts) {
-            Thread newThread = new Thread(() -> {
+            Callable<Integer> callable = () -> {
                 int maxSize = 0;
                 for (int i = 0; i < text.length(); i++) {
                     for (int j = 0; j < text.length(); j++) {
@@ -30,16 +31,22 @@ public class Main {
                     }
                 }
                 System.out.println(text.substring(0, 100) + " -> " + maxSize);
-            });
-            threads.add(newThread);
-            newThread.start();
+                return maxSize;
+            };
+            ExecutorService threadPool = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
+            Future<Integer> task = threadPool.submit(callable);
+            futures.add(task);
+            threadPool.shutdown();
         }
-        for (Thread thread : threads) {
-            thread.join(); // зависаем, ждём когда поток объект которого лежит в thread завершится
+        int maxValue = 0;
+        for (Future<Integer> future : futures) {
+            Integer resultOfTask = future.get();
+            if (resultOfTask > maxValue) maxValue = resultOfTask;
         }
         long endTs = System.currentTimeMillis(); // end time
 
         System.out.println("Time: " + (endTs - startTs) + "ms");
+        System.out.println("Maximum interval of values among all rows: " + maxValue);
     }
 
     public static String generateText(String letters, int length) {
